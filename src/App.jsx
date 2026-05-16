@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { MapContainer, TileLayer, useMap, GeoJSON, Popup } from 'react-leaflet'
 import L from 'leaflet'
 import * as shp from 'shpjs'
-import { Ruler, Map as MapIcon, Moon, Sun, Search, Layers, ChevronRight, ChevronLeft, Ambulance, Hospital as HospitalIcon, Baby, Trees, BookOpen, School, GraduationCap, Shield } from 'lucide-react'
+import { Ruler, Map as MapIcon, Moon, Sun, Search, Layers, ChevronRight, ChevronLeft, Ambulance, Hospital as HospitalIcon, Baby, Trees, BookOpen, School, GraduationCap, Shield, Check, X } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import 'leaflet/dist/leaflet.css'
 import './App.css'
+import * as turf from '@turf/turf'
 
 const DEFAULT_CENTER = [41.92, 42.00]
 const DEFAULT_ZOOM = 11
@@ -83,25 +84,25 @@ export default function App() {
   const [muni2024, setMuni2024] = useState(null)
   const [relig2024, setRelig2024] = useState(null)
 
-  // Social Infrastructure Layers
-  const [emergencyData, setEmergencyData] = useState(null)
-  const [hospitalData, setHospitalData] = useState(null)
-  const [kindergartenData, setKindergartenData] = useState(null)
-  const [parkData, setParkData] = useState(null)
-  const [privateSchoolData, setPrivateSchoolData] = useState(null)
-  const [publicSchoolData, setPublicSchoolData] = useState(null)
-  const [schoolsOutsideData, setSchoolsOutsideData] = useState(null)
-  const [policeData, setPoliceData] = useState(null)
+  // Social Infrastructure Layers (Points)
+  const [dataEmergency, setDataEmergency] = useState(null)
+  const [dataHospital, setDataHospital] = useState(null)
+  const [dataKindergarten, setDataKindergarten] = useState(null)
+  const [dataParks, setDataParks] = useState(null)
+  const [dataPrivateSchool, setDataPrivateSchool] = useState(null)
+  const [dataPublicSchool, setDataPublicSchool] = useState(null)
+  const [dataSchoolsOutside, setDataSchoolsOutside] = useState(null)
+  const [dataPolice, setDataPolice] = useState(null)
 
-  // Service Area (Buffer) Layers
-  const [emergencyAreaData, setEmergencyAreaData] = useState(null)
-  const [hospitalAreaData, setHospitalAreaData] = useState(null)
-  const [kindergartenAreaData, setKindergartenAreaData] = useState(null)
-  const [parkAreaData, setParkAreaData] = useState(null)
-  const [privateSchoolAreaData, setPrivateSchoolAreaData] = useState(null)
-  const [publicSchoolAreaData, setPublicSchoolAreaData] = useState(null)
-  const [schoolsOutsideAreaData, setSchoolsOutsideAreaData] = useState(null)
-  const [policeAreaData, setPoliceAreaData] = useState(null)
+  // Service Area Layers (Buffers from Shapefiles)
+  const [areaEmergency, setAreaEmergency] = useState(null)
+  const [areaHospital, setAreaHospital] = useState(null)
+  const [areaKindergarten, setAreaKindergarten] = useState(null)
+  const [areaParks, setAreaParks] = useState(null)
+  const [areaPrivateSchool, setAreaPrivateSchool] = useState(null)
+  const [areaPublicSchool, setAreaPublicSchool] = useState(null)
+  const [areaSchoolsOutside, setAreaSchoolsOutside] = useState(null)
+  const [areaPolice, setAreaPolice] = useState(null)
 
   const [mapBounds, setMapBounds] = useState(null)
   const [theme, setTheme] = useState('dark')
@@ -122,32 +123,26 @@ export default function App() {
     muni2024: false,
     relig2024: false,
     // Social Infrastructure
-    emergency: true,
-    hospital: true,
-    kindergarten: true,
-    park: true,
-    privateSchool: true,
-    publicSchool: true,
-    schoolsOutside: true,
-    police: true,
+    inf_emergency: true,
+    inf_hospital: true,
     // Service Areas
-    emergencyArea: true,
-    hospitalArea: true,
-    kindergartenArea: true,
-    parkArea: true,
-    privateSchoolArea: true,
-    publicSchoolArea: true,
-    schoolsOutsideArea: true,
-    policeArea: true
+    srv_emergency: true,
+    srv_hospital: true,
+    srv_kindergarten: true,
+    srv_parks: true,
+    srv_privateSchool: true,
+    srv_publicSchool: true,
+    srv_schoolsOutside: true,
+    srv_police: true
   })
 
   const slideLayerSets = [
     // Slide 1: Land Plots overview
-    { projectArea: true, plots2024: true, plots2026: true, state2026: false, muni2026: false, relig2026: false, state2024: false, muni2024: false, relig2024: false, emergency: false, hospital: false, kindergarten: false, park: false, privateSchool: false, publicSchool: false, schoolsOutside: false, police: false, emergencyArea: false, hospitalArea: false, kindergartenArea: false, parkArea: false, privateSchoolArea: false, publicSchoolArea: false, schoolsOutsideArea: false, policeArea: false },
+    { projectArea: true, plots2024: true, plots2026: true, state2026: false, muni2026: false, relig2026: false, state2024: false, muni2024: false, relig2024: false, inf_emergency: false, inf_hospital: false, inf_kindergarten: false, inf_parks: false, inf_privateSchool: false, inf_publicSchool: false, inf_schoolsOutside: false, inf_police: false, srv_emergency: false, srv_hospital: false, srv_kindergarten: false, srv_parks: false, srv_privateSchool: false, srv_publicSchool: false, srv_schoolsOutside: false, srv_police: false },
     // Slide 2: Ownership breakdown
-    { projectArea: true, plots2024: false, plots2026: false, state2026: true, muni2026: true, relig2026: true, state2024: true, muni2024: true, relig2024: true, emergency: false, hospital: false, kindergarten: false, park: false, privateSchool: false, publicSchool: false, schoolsOutside: false, police: false, emergencyArea: false, hospitalArea: false, kindergartenArea: false, parkArea: false, privateSchoolArea: false, publicSchoolArea: false, schoolsOutsideArea: false, policeArea: false },
+    { projectArea: true, plots2024: false, plots2026: false, state2026: true, muni2026: true, relig2026: true, state2024: true, muni2024: true, relig2024: true, inf_emergency: false, inf_hospital: false, inf_kindergarten: false, inf_parks: false, inf_privateSchool: false, inf_publicSchool: false, inf_schoolsOutside: false, inf_police: false, srv_emergency: false, srv_hospital: false, srv_kindergarten: false, srv_parks: false, srv_privateSchool: false, srv_publicSchool: false, srv_schoolsOutside: false, srv_police: false },
     // Slide 3: Social Infrastructure
-    { projectArea: true, plots2024: false, plots2026: false, state2026: false, muni2026: false, relig2026: false, state2024: false, muni2024: false, relig2024: false, emergency: true, hospital: true, kindergarten: true, park: true, privateSchool: true, publicSchool: true, schoolsOutside: true, police: true, emergencyArea: true, hospitalArea: true, kindergartenArea: true, parkArea: true, privateSchoolArea: true, publicSchoolArea: true, schoolsOutsideArea: true, policeArea: true }
+    { projectArea: true, plots2024: false, plots2026: false, state2026: false, muni2026: false, relig2026: false, state2024: false, muni2024: false, relig2024: false, inf_emergency: true, inf_hospital: true, inf_kindergarten: true, inf_parks: true, inf_privateSchool: true, inf_publicSchool: true, inf_schoolsOutside: true, inf_police: true, srv_emergency: true, srv_hospital: true, srv_kindergarten: true, srv_parks: true, srv_privateSchool: true, srv_publicSchool: true, srv_schoolsOutside: true, srv_police: true }
   ]
 
   const slides = [
@@ -160,10 +155,11 @@ export default function App() {
     const loadData = async () => {
       try {
         const fetchShapefile = async (baseUrl) => {
+          const v = Date.now()
           const [shpRes, dbfRes, prjRes] = await Promise.all([
-            fetch(`${baseUrl}.shp`),
-            fetch(`${baseUrl}.dbf`),
-            fetch(`${baseUrl}.prj`)
+            fetch(`${baseUrl}.shp?v=${v}`),
+            fetch(`${baseUrl}.dbf?v=${v}`),
+            fetch(`${baseUrl}.prj?v=${v}`)
           ])
           if (!shpRes.ok || !dbfRes.ok) throw new Error(`Failed to fetch ${baseUrl}`)
           const [shpBuffer, dbfBuffer, prjString] = await Promise.all([
@@ -175,7 +171,7 @@ export default function App() {
         }
 
         // 1. Load Core Layers
-        const areaData = await shp.default('/data/ozurgeti_sakvlevi_areali.zip')
+        const areaData = await shp.default(`/data/ozurgeti_sakvlevi_areali.zip?v=${Date.now()}`)
         setGeoJsonData(areaData)
         setMapBounds(L.geoJSON(areaData).getBounds())
 
@@ -192,25 +188,25 @@ export default function App() {
         setMuni2024(await fetchShapefile('/data/Old_municipaluri'))
         setRelig2024(await fetchShapefile('/data/Old_religia'))
 
-        // 4. Load Social Infrastructure Layers
-        setEmergencyData(await fetchShapefile('/data/Emergency_Medical_Services'))
-        setHospitalData(await fetchShapefile('/data/Hospital'))
-        setKindergartenData(await fetchShapefile('/data/Kindergarten'))
-        setParkData(await fetchShapefile('/data/Park'))
-        setPrivateSchoolData(await fetchShapefile('/data/Private_School'))
-        setPublicSchoolData(await fetchShapefile('/data/Public_School'))
-        setSchoolsOutsideData(await fetchShapefile('/data/Schools_outside'))
-        setPoliceData(await fetchShapefile('/data/Police_Emergency_Services'))
+        // 4. Load Infrastructure Points
+        setDataEmergency(await fetchShapefile('/data/Emergency_Medical_Services'))
+        setDataHospital(await fetchShapefile('/data/Hospital'))
+        setDataKindergarten(await fetchShapefile('/data/Kindergarten'))
+        setDataParks(await fetchShapefile('/data/Park'))
+        setDataPrivateSchool(await fetchShapefile('/data/Private_School'))
+        setDataPublicSchool(await fetchShapefile('/data/Public_School'))
+        setDataSchoolsOutside(await fetchShapefile('/data/Schools_outside'))
+        setDataPolice(await fetchShapefile('/data/Police_Emergency_Services'))
 
-        // 5. Load Service Area (Buffer) Layers
-        setEmergencyAreaData(await fetchShapefile('/data/Emergency Medical Services_2000m'))
-        setHospitalAreaData(await fetchShapefile('/data/Hospital_1000m'))
-        setKindergartenAreaData(await fetchShapefile('/data/Kindergarten_500m'))
-        setParkAreaData(await fetchShapefile('/data/Parks_500m'))
-        setPrivateSchoolAreaData(await fetchShapefile('/data/Private_School_750m'))
-        setPublicSchoolAreaData(await fetchShapefile('/data/Public_School_750m'))
-        setSchoolsOutsideAreaData(await fetchShapefile('/data/Outside_School_750m'))
-        setPoliceAreaData(await fetchShapefile('/data/Police_Emergency Services_2000m'))
+        // 5. Load Service Area Buffers
+        setAreaEmergency(await fetchShapefile('/data/Emergency Medical Services_2000m'))
+        setAreaHospital(await fetchShapefile('/data/Hospital_1000m'))
+        setAreaKindergarten(await fetchShapefile('/data/Kindergarten_500m'))
+        setAreaParks(await fetchShapefile('/data/Parks_500m'))
+        setAreaPrivateSchool(await fetchShapefile('/data/Private_School_750m'))
+        setAreaPublicSchool(await fetchShapefile('/data/Public_School_750m'))
+        setAreaSchoolsOutside(await fetchShapefile('/data/Outside_School_750m'))
+        setAreaPolice(await fetchShapefile('/data/Police_Emergency Services_2000m'))
 
       } catch (error) {
         console.error('Error loading geospatial data:', error)
@@ -460,226 +456,72 @@ export default function App() {
             <GeoJSON data={relig2024} style={{ color: '#D51747', weight: 1.5, fillColor: '#D51747', fillOpacity: 0.6 }} />
           )}
 
-          {/* Social Infrastructure Layers — Slide 3 */}
-          {emergencyData && layers.emergency && (
-            <GeoJSON
-              key="emergency"
-              data={emergencyData}
-              pointToLayer={(feature, latlng) => L.marker(latlng, { icon: L.divIcon({
-                className: '',
-                html: `<div class="svg-marker" style="--mc:#ff3d3d">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#ff3d3d" stroke="#fff" stroke-width="1"/>
-                    <text x="12" y="13" text-anchor="middle" font-size="9" font-weight="bold" fill="#fff" font-family="Arial">✚</text>
-                  </svg>
-                </div>`,
-                iconSize: [34, 40],
-                iconAnchor: [17, 40],
-                popupAnchor: [0, -42]
-              })})}
-              onEachFeature={(feature, layer) => {
-                const p = feature.properties || {}
-                layer.bindPopup(`<div class="popup-content"><h4>🚑 Emergency Medical Service</h4></div>`, { className: 'custom-popup' })
-              }}
-            />
+          {/* Infrastructure Points */}
+          {dataEmergency && layers.inf_emergency && (
+            <GeoJSON key={`inf-em-${dataEmergency.features?.length}-${Date.now()}`} data={dataEmergency}
+              pointToLayer={(f, l) => L.marker(l, { icon: L.divIcon({ className: '', html: `<div class="svg-marker" style="--mc:#ff3d3d"><svg viewBox="0 0 24 24"><path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#ff3d3d" stroke="#fff" stroke-width="1"/><text x="12" y="13" text-anchor="middle" font-size="9" font-weight="bold" fill="#fff" font-family="Arial">✚</text></svg></div>`, iconSize: [34, 40], iconAnchor: [17, 40], popupAnchor: [0, -42] })})}
+              onEachFeature={(f, l) => l.bindPopup('<div class="popup-content"><h4>🚑 Emergency Service</h4></div>', { className: 'custom-popup' })} />
           )}
-          {hospitalData && layers.hospital && (
-            <GeoJSON
-              key="hospital"
-              data={hospitalData}
-              pointToLayer={(feature, latlng) => L.marker(latlng, { icon: L.divIcon({
-                className: '',
-                html: `<div class="svg-marker" style="--mc:#e040fb">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#e040fb" stroke="#fff" stroke-width="1"/>
-                    <rect x="10" y="7" width="4" height="7" rx="0.5" fill="#fff"/>
-                    <rect x="8" y="9" width="8" height="3" rx="0.5" fill="#fff"/>
-                  </svg>
-                </div>`,
-                iconSize: [34, 40],
-                iconAnchor: [17, 40],
-                popupAnchor: [0, -42]
-              })})}
-              onEachFeature={(feature, layer) => {
-                const p = feature.properties || {}
-                layer.bindPopup(`<div class="popup-content"><h4>🏥 Hospital</h4></div>`, { className: 'custom-popup' })
-              }}
-            />
+          {dataHospital && layers.inf_hospital && (
+            <GeoJSON key={`inf-hs-${dataHospital.features?.length}-${Date.now()}`} data={dataHospital}
+              pointToLayer={(f, l) => L.marker(l, { icon: L.divIcon({ className: '', html: `<div class="svg-marker" style="--mc:#e040fb"><svg viewBox="0 0 24 24"><path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#e040fb" stroke="#fff" stroke-width="1"/><rect x="10" y="7" width="4" height="7" fill="#fff"/><rect x="8" y="9" width="8" height="3" fill="#fff"/></svg></div>`, iconSize: [34, 40], iconAnchor: [17, 40], popupAnchor: [0, -42] })})}
+              onEachFeature={(f, l) => l.bindPopup('<div class="popup-content"><h4>🏥 Hospital</h4></div>', { className: 'custom-popup' })} />
           )}
-          {kindergartenData && layers.kindergarten && (
-            <GeoJSON
-              key="kindergarten"
-              data={kindergartenData}
-              pointToLayer={(feature, latlng) => L.marker(latlng, { icon: L.divIcon({
-                className: '',
-                html: `<div class="svg-marker" style="--mc:#ff9800">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#ff9800" stroke="#fff" stroke-width="1"/>
-                    <circle cx="12" cy="9" r="2.5" fill="#fff"/>
-                    <path d="M8 14c0-2 1.8-3 4-3s4 1 4 3" stroke="#fff" stroke-width="1.2" stroke-linecap="round" fill="none"/>
-                  </svg>
-                </div>`,
-                iconSize: [34, 40],
-                iconAnchor: [17, 40],
-                popupAnchor: [0, -42]
-              })})}
-              onEachFeature={(feature, layer) => {
-                const p = feature.properties || {}
-                layer.bindPopup(`<div class="popup-content"><h4>🧒 Kindergarten</h4></div>`, { className: 'custom-popup' })
-              }}
-            />
+          {dataKindergarten && layers.inf_kindergarten && (
+            <GeoJSON key={`inf-kg-${dataKindergarten.features?.length}-${Date.now()}`} data={dataKindergarten}
+              pointToLayer={(f, l) => L.marker(l, { icon: L.divIcon({ className: '', html: `<div class="svg-marker" style="--mc:#ff9800"><svg viewBox="0 0 24 24"><path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#ff9800" stroke="#fff" stroke-width="1"/><circle cx="12" cy="9" r="2.5" fill="#fff"/><path d="M8 14c0-2 1.8-3 4-3s4 1 4 3" stroke="#fff" stroke-width="1.2" fill="none"/></svg></div>`, iconSize: [34, 40], iconAnchor: [17, 40], popupAnchor: [0, -42] })})}
+              onEachFeature={(f, l) => l.bindPopup('<div class="popup-content"><h4>🧒 Kindergarten</h4></div>', { className: 'custom-popup' })} />
           )}
-          {parkData && layers.park && (
-            <GeoJSON
-              key={`park-pts-${parkData.features?.length ?? 0}`}
-              data={parkData}
-              pointToLayer={(feature, latlng) => {
-                const icon = L.divIcon({
-                  className: '',
-                  html: `<div class="svg-marker" style="--mc:#43a047"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#43a047" stroke="#fff" stroke-width="1"/><path d="M12 13.5V16" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/><path d="M9 11c0-1.66 1.34-3 3-3s3 1.34 3 3c0 1.1-.6 2.06-1.5 2.57L12 14l-1.5-.43C9.6 13.06 9 12.1 9 11z" fill="#fff"/><path d="M10 9.5c0-.5.3-2 2-2" stroke="#fff" stroke-width="0.8" stroke-linecap="round" fill="none"/></svg></div>`,
-                  iconSize: [34, 40],
-                  iconAnchor: [17, 40],
-                  popupAnchor: [0, -42]
-                })
-                return L.marker(latlng, { icon })
-              }}
-              onEachFeature={(_, layer) => {
-                layer.bindPopup(`<div class="popup-content"><h4>🌳 Park</h4></div>`, { className: 'custom-popup' })
-              }}
-            />
+          {dataParks && layers.inf_parks && (
+            <GeoJSON key={`inf-pk-${dataParks.features?.length}-${Date.now()}`} data={dataParks}
+              pointToLayer={(f, l) => L.marker(l, { icon: L.divIcon({ className: '', html: `<div class="svg-marker" style="--mc:#43a047"><svg viewBox="0 0 24 24"><path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#43a047" stroke="#fff" stroke-width="1"/><path d="M12 13.5V16" stroke="#fff" stroke-width="1.3"/><path d="M9 11c0-1.66 1.34-3 3-3s3 1.34 3 3c0 1.1-.6 2.06-1.5 2.57L12 14l-1.5-.43C9.6 13.06 9 12.1 9 11z" fill="#fff"/></svg></div>`, iconSize: [34, 40], iconAnchor: [17, 40], popupAnchor: [0, -42] })})}
+              onEachFeature={(f, l) => l.bindPopup('<div class="popup-content"><h4>🌳 Park</h4></div>', { className: 'custom-popup' })} />
           )}
-          {privateSchoolData && layers.privateSchool && (
-            <GeoJSON
-              key="privateSchool"
-              data={privateSchoolData}
-              pointToLayer={(feature, latlng) => L.marker(latlng, { icon: L.divIcon({
-                className: '',
-                html: `<div class="svg-marker" style="--mc:#29b6f6">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#29b6f6" stroke="#fff" stroke-width="1"/>
-                    <rect x="8" y="10" width="8" height="5.5" rx="0.5" stroke="#fff" stroke-width="1.1" fill="none"/>
-                    <path d="M8 10l4-3.5 4 3.5" stroke="#fff" stroke-width="1.1" stroke-linejoin="round" fill="none"/>
-                    <rect x="10.5" y="12" width="3" height="3.5" rx="0.3" fill="#fff"/>
-                  </svg>
-                </div>`,
-                iconSize: [34, 40],
-                iconAnchor: [17, 40],
-                popupAnchor: [0, -42]
-              })})}
-              onEachFeature={(feature, layer) => {
-                const p = feature.properties || {}
-                layer.bindPopup(`<div class="popup-content"><h4>🏫 Private School</h4></div>`, { className: 'custom-popup' })
-              }}
-            />
+          {dataPrivateSchool && layers.inf_privateSchool && (
+            <GeoJSON key={`inf-ps-${dataPrivateSchool.features?.length}-${Date.now()}`} data={dataPrivateSchool}
+              pointToLayer={(f, l) => L.marker(l, { icon: L.divIcon({ className: '', html: `<div class="svg-marker" style="--mc:#29b6f6"><svg viewBox="0 0 24 24"><path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#29b6f6" stroke="#fff" stroke-width="1"/><rect x="8" y="10" width="8" height="5.5" stroke="#fff" stroke-width="1.1" fill="none"/><path d="M8 10l4-3.5 4 3.5" stroke="#fff" stroke-width="1.1" fill="none"/><rect x="10.5" y="12" width="3" height="3.5" fill="#fff"/></svg></div>`, iconSize: [34, 40], iconAnchor: [17, 40], popupAnchor: [0, -42] })})}
+              onEachFeature={(f, l) => l.bindPopup('<div class="popup-content"><h4>🏫 Private School</h4></div>', { className: 'custom-popup' })} />
           )}
-          {publicSchoolData && layers.publicSchool && (
-            <GeoJSON
-              key="publicSchool"
-              data={publicSchoolData}
-              pointToLayer={(feature, latlng) => L.marker(latlng, { icon: L.divIcon({
-                className: '',
-                html: `<div class="svg-marker" style="--mc:#f9a825">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#f9a825" stroke="#fff" stroke-width="1"/>
-                    <rect x="8" y="10" width="8" height="5.5" rx="0.5" stroke="#fff" stroke-width="1.1" fill="none"/>
-                    <path d="M8 10l4-3.5 4 3.5" stroke="#fff" stroke-width="1.1" stroke-linejoin="round" fill="none"/>
-                    <rect x="10.5" y="12" width="3" height="3.5" rx="0.3" fill="#fff"/>
-                    <line x1="10" y1="10" x2="10" y2="8" stroke="#fff" stroke-width="1" />
-                    <circle cx="10" cy="7.5" r="1" fill="#fff"/>
-                  </svg>
-                </div>`,
-                iconSize: [34, 40],
-                iconAnchor: [17, 40],
-                popupAnchor: [0, -42]
-              })})}
-              onEachFeature={(feature, layer) => {
-                const p = feature.properties || {}
-                layer.bindPopup(`<div class="popup-content"><h4>🏛️ Public School</h4></div>`, { className: 'custom-popup' })
-              }}
-            />
+          {dataPublicSchool && layers.inf_publicSchool && (
+            <GeoJSON key={`inf-pb-${dataPublicSchool.features?.length}-${Date.now()}`} data={dataPublicSchool}
+              pointToLayer={(f, l) => L.marker(l, { icon: L.divIcon({ className: '', html: `<div class="svg-marker" style="--mc:#f9a825"><svg viewBox="0 0 24 24"><path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#f9a825" stroke="#fff" stroke-width="1"/><rect x="8" y="10" width="8" height="5.5" stroke="#fff" stroke-width="1.1" fill="none"/><path d="M8 10l4-3.5 4 3.5" stroke="#fff" stroke-width="1.1" fill="none"/><rect x="10.5" y="12" width="3" height="3.5" fill="#fff"/></svg></div>`, iconSize: [34, 40], iconAnchor: [17, 40], popupAnchor: [0, -42] })})}
+              onEachFeature={(f, l) => l.bindPopup('<div class="popup-content"><h4>🏛️ Public School</h4></div>', { className: 'custom-popup' })} />
           )}
-          {schoolsOutsideData && layers.schoolsOutside && (
-            <GeoJSON
-              key="schoolsOutside"
-              data={schoolsOutsideData}
-              pointToLayer={(feature, latlng) => L.marker(latlng, { icon: L.divIcon({
-                className: '',
-                html: `<div class="svg-marker" style="--mc:#78909c">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#78909c" stroke="#fff" stroke-width="1"/>
-                    <path d="M8 10.5l4-2.5 4 2.5" stroke="#fff" stroke-width="1.1" stroke-linejoin="round" fill="none"/>
-                    <rect x="9.5" y="7" width="5" height="1.2" rx="0.5" fill="#fff"/>
-                    <rect x="8" y="10.5" width="8" height="5" rx="0.5" stroke="#fff" stroke-width="1" fill="none"/>
-                    <rect x="10.5" y="12.3" width="3" height="3.2" rx="0.3" fill="#fff"/>
-                  </svg>
-                </div>`,
-                iconSize: [34, 40],
-                iconAnchor: [17, 40],
-                popupAnchor: [0, -42]
-              })})}
-              onEachFeature={(feature, layer) => {
-                const p = feature.properties || {}
-                layer.bindPopup(`<div class="popup-content"><h4>🎓 School Outside</h4></div>`, { className: 'custom-popup' })
-              }}
-            />
+          {dataSchoolsOutside && layers.inf_schoolsOutside && (
+            <GeoJSON key={`inf-so-${dataSchoolsOutside.features?.length}-${Date.now()}`} data={dataSchoolsOutside}
+              pointToLayer={(f, l) => L.marker(l, { icon: L.divIcon({ className: '', html: `<div class="svg-marker" style="--mc:#78909c"><svg viewBox="0 0 24 24"><path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#78909c" stroke="#fff" stroke-width="1"/><path d="M8 10.5l4-2.5 4 2.5" stroke="#fff" stroke-width="1.1" fill="none"/><rect x="8" y="10.5" width="8" height="5" stroke="#fff" stroke-width="1" fill="none"/><rect x="10.5" y="12.3" width="3" height="3.2" fill="#fff"/></svg></div>`, iconSize: [34, 40], iconAnchor: [17, 40], popupAnchor: [0, -42] })})}
+              onEachFeature={(f, l) => l.bindPopup('<div class="popup-content"><h4>🎓 School Outside</h4></div>', { className: 'custom-popup' })} />
           )}
-          {policeData && layers.police && (
-            <GeoJSON
-              key="police"
-              data={policeData}
-              pointToLayer={(feature, latlng) => L.marker(latlng, { icon: L.divIcon({
-                className: '',
-                html: `<div class="svg-marker" style="--mc:#1565c0">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#1565c0" stroke="#fff" stroke-width="1"/>
-                    <path d="M12 6.5 L15.5 8 L15.5 11 Q15.5 13.5 12 14.5 Q8.5 13.5 8.5 11 L8.5 8 Z" fill="#fff" stroke="#1565c0" stroke-width="0.4"/>
-                    <line x1="10.8" y1="10" x2="13.2" y2="10" stroke="#1565c0" stroke-width="1" stroke-linecap="round"/>
-                    <line x1="12" y1="8.8" x2="12" y2="11.2" stroke="#1565c0" stroke-width="1" stroke-linecap="round"/>
-                  </svg>
-                </div>`,
-                iconSize: [34, 40],
-                iconAnchor: [17, 40],
-                popupAnchor: [0, -42]
-              })})}
-              onEachFeature={(feature, layer) => {
-                const p = feature.properties || {}
-                layer.bindPopup(`<div class="popup-content"><h4>🚔 Police / Emergency Services</h4></div>`, { className: 'custom-popup' })
-              }}
-            />
+          {dataPolice && layers.inf_police && (
+            <GeoJSON key={`inf-po-${dataPolice.features?.length}-${Date.now()}`} data={dataPolice}
+              pointToLayer={(f, l) => L.marker(l, { icon: L.divIcon({ className: '', html: `<div class="svg-marker" style="--mc:#1565c0"><svg viewBox="0 0 24 24"><path d="M12 2C7.58 2 4 5.58 4 10c0 5.5 8 14 8 14s8-8.5 8-14c0-4.42-3.58-8-8-8z" fill="#1565c0" stroke="#fff" stroke-width="1"/><path d="M12 6.5 L15.5 8 L15.5 11 Q15.5 13.5 12 14.5 Q8.5 13.5 8.5 11 L8.5 8 Z" fill="#fff" stroke="#1565c0" stroke-width="0.4"/><line x1="10.8" y1="10" x2="13.2" y2="10" stroke="#1565c0" stroke-width="1"/><line x1="12" y1="8.8" x2="12" y2="11.2" stroke="#1565c0" stroke-width="1"/></svg></div>`, iconSize: [34, 40], iconAnchor: [17, 40], popupAnchor: [0, -42] })})}
+              onEachFeature={(f, l) => l.bindPopup('<div class="popup-content"><h4>🚔 Police / Emergency</h4></div>', { className: 'custom-popup' })} />
           )}
 
-          {/* Service Area Buffer Layers — rendered BELOW pins */}
-          {policeAreaData && layers.policeArea && (
-            <GeoJSON key="policeArea" data={policeAreaData}
-              style={{ color: '#1565c0', weight: 1.5, dashArray: '5,4', fillColor: '#1565c0', fillOpacity: 0.12 }} />
+          {/* Service Areas (Polygons from Shapefiles) */}
+          {areaEmergency && layers.srv_emergency && (
+            <GeoJSON key={`srv-em-${areaEmergency.features?.length}-${Date.now()}`} data={areaEmergency} style={{ color: '#ff3d3d', weight: 1.5, dashArray: '5,4', fillColor: '#ff3d3d', fillOpacity: 0.12 }} />
           )}
-          {emergencyAreaData && layers.emergencyArea && (
-            <GeoJSON key="emergencyArea" data={emergencyAreaData}
-              style={{ color: '#ff3d3d', weight: 1.5, dashArray: '5,4', fillColor: '#ff3d3d', fillOpacity: 0.12 }} />
+          {areaHospital && layers.srv_hospital && (
+            <GeoJSON key={`srv-hs-${areaHospital.features?.length}-${Date.now()}`} data={areaHospital} style={{ color: '#e040fb', weight: 1.5, dashArray: '5,4', fillColor: '#e040fb', fillOpacity: 0.12 }} />
           )}
-          {hospitalAreaData && layers.hospitalArea && (
-            <GeoJSON key="hospitalArea" data={hospitalAreaData}
-              style={{ color: '#e040fb', weight: 1.5, dashArray: '5,4', fillColor: '#e040fb', fillOpacity: 0.12 }} />
+          {areaKindergarten && layers.srv_kindergarten && (
+            <GeoJSON key={`srv-kg-${areaKindergarten.features?.length}-${Date.now()}`} data={areaKindergarten} style={{ color: '#ff9800', weight: 1.5, dashArray: '5,4', fillColor: '#ff9800', fillOpacity: 0.12 }} />
           )}
-          {kindergartenAreaData && layers.kindergartenArea && (
-            <GeoJSON key="kindergartenArea" data={kindergartenAreaData}
-              style={{ color: '#ff9800', weight: 1.5, dashArray: '5,4', fillColor: '#ff9800', fillOpacity: 0.12 }} />
+          {areaParks && layers.srv_parks && (
+            <GeoJSON key={`srv-pk-${areaParks.features?.length}-${Date.now()}`} data={areaParks} style={{ color: '#43a047', weight: 1.5, dashArray: '5,4', fillColor: '#43a047', fillOpacity: 0.12 }} />
           )}
-          {privateSchoolAreaData && layers.privateSchoolArea && (
-            <GeoJSON key="privateSchoolArea" data={privateSchoolAreaData}
-              style={{ color: '#29b6f6', weight: 1.5, dashArray: '5,4', fillColor: '#29b6f6', fillOpacity: 0.12 }} />
+          {areaPrivateSchool && layers.srv_privateSchool && (
+            <GeoJSON key={`srv-ps-${areaPrivateSchool.features?.length}-${Date.now()}`} data={areaPrivateSchool} style={{ color: '#29b6f6', weight: 1.5, dashArray: '5,4', fillColor: '#29b6f6', fillOpacity: 0.12 }} />
           )}
-          {publicSchoolAreaData && layers.publicSchoolArea && (
-            <GeoJSON key="publicSchoolArea" data={publicSchoolAreaData}
-              style={{ color: '#f9a825', weight: 1.5, dashArray: '5,4', fillColor: '#f9a825', fillOpacity: 0.12 }} />
+          {areaPublicSchool && layers.srv_publicSchool && (
+            <GeoJSON key={`srv-pb-${areaPublicSchool.features?.length}-${Date.now()}`} data={areaPublicSchool} style={{ color: '#f9a825', weight: 1.5, dashArray: '5,4', fillColor: '#f9a825', fillOpacity: 0.12 }} />
           )}
-          {schoolsOutsideAreaData && layers.schoolsOutsideArea && (
-            <GeoJSON key="schoolsOutsideArea" data={schoolsOutsideAreaData}
-              style={{ color: '#78909c', weight: 1.5, dashArray: '5,4', fillColor: '#78909c', fillOpacity: 0.12 }} />
+          {areaSchoolsOutside && layers.srv_schoolsOutside && (
+            <GeoJSON key={`srv-so-${areaSchoolsOutside.features?.length}-${Date.now()}`} data={areaSchoolsOutside} style={{ color: '#78909c', weight: 1.5, dashArray: '5,4', fillColor: '#78909c', fillOpacity: 0.12 }} />
           )}
-          {parkAreaData && layers.parkArea && (
-            <GeoJSON key="parkArea" data={parkAreaData}
-              style={{ color: '#43a047', weight: 1.5, dashArray: '5,4', fillColor: '#43a047', fillOpacity: 0.12 }} />
+          {areaPolice && layers.srv_police && (
+            <GeoJSON key={`srv-po-${areaPolice.features?.length}-${Date.now()}`} data={areaPolice} style={{ color: '#1565c0', weight: 1.5, dashArray: '5,4', fillColor: '#1565c0', fillOpacity: 0.12 }} />
           )}
 
           <MapController 
@@ -727,8 +569,39 @@ export default function App() {
         </button>
 
         <div className="sidebar-header">
-          <h2>LAYERS</h2>
-          <span className="subtitle">{slides[currentSlide].name.toUpperCase()}</span>
+          <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <div>
+              <h2 style={{ fontSize: '1.1rem', fontWeight: '600' }}>LAYERS</h2>
+              <span className="subtitle">{slides[currentSlide].name.toUpperCase()}</span>
+            </div>
+            <button 
+              className="toggle-all-btn"
+              onClick={() => {
+                const preset = slideLayerSets[currentSlide]
+                const relevantKeys = Object.keys(preset).filter(k => preset[k] === true)
+                const allOn = relevantKeys.every(k => layers[k])
+                const newState = { ...layers }
+                relevantKeys.forEach(k => { newState[k] = !allOn })
+                setLayers(newState)
+              }}
+              title="Toggle all layers in this view"
+            >
+              {(() => {
+                const preset = slideLayerSets[currentSlide]
+                const relevantKeys = Object.keys(preset).filter(k => preset[k] === true)
+                const allOn = relevantKeys.every(k => layers[k])
+                return allOn ? <X size={14} /> : <Check size={14} />
+              })()}
+              <span>
+                {(() => {
+                  const preset = slideLayerSets[currentSlide]
+                  const relevantKeys = Object.keys(preset).filter(k => preset[k] === true)
+                  const allOn = relevantKeys.every(k => layers[k])
+                  return allOn ? 'Uncheck All' : 'Check All'
+                })()}
+              </span>
+            </button>
+          </div>
         </div>
 
         <div className="sidebar-scroll">
@@ -759,87 +632,87 @@ export default function App() {
             {/* Slide 3: Social Infrastructure */}
             {currentSlide === 2 && (<>
               <div className="layer-group-label">HEALTH &amp; SAFETY</div>
-              <div className={`layer-item mini ${layers.police ? 'active' : ''}`} onClick={() => toggleLayer('police')}>
+              <div className={`layer-item mini ${layers.inf_police ? 'active' : ''}`} onClick={() => toggleLayer('inf_police')}>
                 <div className="layer-icon-dot" style={{ background: '#1565c0' }}><Shield size={12} color="#fff" /></div>
                 <span className="layer-name">Police / Emergency Services</span>
-                <input type="checkbox" checked={layers.police} onChange={() => {}} />
+                <input type="checkbox" checked={layers.inf_police} onChange={() => {}} />
               </div>
-              <div className={`layer-item mini service-area ${layers.policeArea ? 'active' : ''}`} onClick={() => toggleLayer('policeArea')}>
+              <div className={`layer-item mini service-area ${layers.srv_police ? 'active' : ''}`} onClick={() => toggleLayer('srv_police')}>
                 <div className="layer-legend-sq" style={{ background: '#1565c0' }}></div>
                 <span className="layer-name">↳ Service Area 2000m</span>
-                <input type="checkbox" checked={layers.policeArea} onChange={() => {}} />
+                <input type="checkbox" checked={layers.srv_police} onChange={() => {}} />
               </div>
-              <div className={`layer-item mini ${layers.emergency ? 'active' : ''}`} onClick={() => toggleLayer('emergency')}>
+              <div className={`layer-item mini ${layers.inf_emergency ? 'active' : ''}`} onClick={() => toggleLayer('inf_emergency')}>
                 <div className="layer-icon-dot" style={{ background: '#ff3d3d' }}><Ambulance size={12} color="#fff" /></div>
                 <span className="layer-name">Emergency Medical Services</span>
-                <input type="checkbox" checked={layers.emergency} onChange={() => {}} />
+                <input type="checkbox" checked={layers.inf_emergency} onChange={() => {}} />
               </div>
-              <div className={`layer-item mini service-area ${layers.emergencyArea ? 'active' : ''}`} onClick={() => toggleLayer('emergencyArea')}>
+              <div className={`layer-item mini service-area ${layers.srv_emergency ? 'active' : ''}`} onClick={() => toggleLayer('srv_emergency')}>
                 <div className="layer-legend-sq" style={{ background: '#ff3d3d' }}></div>
                 <span className="layer-name">↳ Service Area 2000m</span>
-                <input type="checkbox" checked={layers.emergencyArea} onChange={() => {}} />
+                <input type="checkbox" checked={layers.srv_emergency} onChange={() => {}} />
               </div>
-              <div className={`layer-item mini ${layers.hospital ? 'active' : ''}`} onClick={() => toggleLayer('hospital')}>
+              <div className={`layer-item mini ${layers.inf_hospital ? 'active' : ''}`} onClick={() => toggleLayer('inf_hospital')}>
                 <div className="layer-icon-dot" style={{ background: '#e040fb' }}><HospitalIcon size={12} color="#fff" /></div>
                 <span className="layer-name">Hospital</span>
-                <input type="checkbox" checked={layers.hospital} onChange={() => {}} />
+                <input type="checkbox" checked={layers.inf_hospital} onChange={() => {}} />
               </div>
-              <div className={`layer-item mini service-area ${layers.hospitalArea ? 'active' : ''}`} onClick={() => toggleLayer('hospitalArea')}>
+              <div className={`layer-item mini service-area ${layers.srv_hospital ? 'active' : ''}`} onClick={() => toggleLayer('srv_hospital')}>
                 <div className="layer-legend-sq" style={{ background: '#e040fb' }}></div>
                 <span className="layer-name">↳ Service Area 1000m</span>
-                <input type="checkbox" checked={layers.hospitalArea} onChange={() => {}} />
+                <input type="checkbox" checked={layers.srv_hospital} onChange={() => {}} />
               </div>
               <div className="layer-group-label">EDUCATION</div>
-              <div className={`layer-item mini ${layers.kindergarten ? 'active' : ''}`} onClick={() => toggleLayer('kindergarten')}>
+              <div className={`layer-item mini ${layers.inf_kindergarten ? 'active' : ''}`} onClick={() => toggleLayer('inf_kindergarten')}>
                 <div className="layer-icon-dot" style={{ background: '#ff9800' }}><Baby size={12} color="#fff" /></div>
                 <span className="layer-name">Kindergarten</span>
-                <input type="checkbox" checked={layers.kindergarten} onChange={() => {}} />
+                <input type="checkbox" checked={layers.inf_kindergarten} onChange={() => {}} />
               </div>
-              <div className={`layer-item mini service-area ${layers.kindergartenArea ? 'active' : ''}`} onClick={() => toggleLayer('kindergartenArea')}>
+              <div className={`layer-item mini service-area ${layers.srv_kindergarten ? 'active' : ''}`} onClick={() => toggleLayer('srv_kindergarten')}>
                 <div className="layer-legend-sq" style={{ background: '#ff9800' }}></div>
-                <span className="layer-name">↳ Service Area 500m</span>
-                <input type="checkbox" checked={layers.kindergartenArea} onChange={() => {}} />
+                <span className="layer-name">↳ Kindergarten_500m</span>
+                <input type="checkbox" checked={layers.srv_kindergarten} onChange={() => {}} />
               </div>
-              <div className={`layer-item mini ${layers.privateSchool ? 'active' : ''}`} onClick={() => toggleLayer('privateSchool')}>
+              <div className={`layer-item mini ${layers.inf_privateSchool ? 'active' : ''}`} onClick={() => toggleLayer('inf_privateSchool')}>
                 <div className="layer-icon-dot" style={{ background: '#29b6f6' }}><BookOpen size={12} color="#fff" /></div>
                 <span className="layer-name">Private School</span>
-                <input type="checkbox" checked={layers.privateSchool} onChange={() => {}} />
+                <input type="checkbox" checked={layers.inf_privateSchool} onChange={() => {}} />
               </div>
-              <div className={`layer-item mini service-area ${layers.privateSchoolArea ? 'active' : ''}`} onClick={() => toggleLayer('privateSchoolArea')}>
+              <div className={`layer-item mini service-area ${layers.srv_privateSchool ? 'active' : ''}`} onClick={() => toggleLayer('srv_privateSchool')}>
                 <div className="layer-legend-sq" style={{ background: '#29b6f6' }}></div>
-                <span className="layer-name">↳ Service Area 750m</span>
-                <input type="checkbox" checked={layers.privateSchoolArea} onChange={() => {}} />
+                <span className="layer-name">↳ Private_School_750m</span>
+                <input type="checkbox" checked={layers.srv_privateSchool} onChange={() => {}} />
               </div>
-              <div className={`layer-item mini ${layers.publicSchool ? 'active' : ''}`} onClick={() => toggleLayer('publicSchool')}>
+              <div className={`layer-item mini ${layers.inf_publicSchool ? 'active' : ''}`} onClick={() => toggleLayer('inf_publicSchool')}>
                 <div className="layer-icon-dot" style={{ background: '#f9a825' }}><School size={12} color="#333" /></div>
                 <span className="layer-name">Public School</span>
-                <input type="checkbox" checked={layers.publicSchool} onChange={() => {}} />
+                <input type="checkbox" checked={layers.inf_publicSchool} onChange={() => {}} />
               </div>
-              <div className={`layer-item mini service-area ${layers.publicSchoolArea ? 'active' : ''}`} onClick={() => toggleLayer('publicSchoolArea')}>
+              <div className={`layer-item mini service-area ${layers.srv_publicSchool ? 'active' : ''}`} onClick={() => toggleLayer('srv_publicSchool')}>
                 <div className="layer-legend-sq" style={{ background: '#f9a825' }}></div>
-                <span className="layer-name">↳ Service Area 750m</span>
-                <input type="checkbox" checked={layers.publicSchoolArea} onChange={() => {}} />
+                <span className="layer-name">↳ Public_School_750m</span>
+                <input type="checkbox" checked={layers.srv_publicSchool} onChange={() => {}} />
               </div>
-              <div className={`layer-item mini ${layers.schoolsOutside ? 'active' : ''}`} onClick={() => toggleLayer('schoolsOutside')}>
+              <div className={`layer-item mini ${layers.inf_schoolsOutside ? 'active' : ''}`} onClick={() => toggleLayer('inf_schoolsOutside')}>
                 <div className="layer-icon-dot" style={{ background: '#78909c' }}><GraduationCap size={12} color="#fff" /></div>
                 <span className="layer-name">Schools Outside</span>
-                <input type="checkbox" checked={layers.schoolsOutside} onChange={() => {}} />
+                <input type="checkbox" checked={layers.inf_schoolsOutside} onChange={() => {}} />
               </div>
-              <div className={`layer-item mini service-area ${layers.schoolsOutsideArea ? 'active' : ''}`} onClick={() => toggleLayer('schoolsOutsideArea')}>
+              <div className={`layer-item mini service-area ${layers.srv_schoolsOutside ? 'active' : ''}`} onClick={() => toggleLayer('srv_schoolsOutside')}>
                 <div className="layer-legend-sq" style={{ background: '#78909c' }}></div>
                 <span className="layer-name">↳ Service Area 750m</span>
-                <input type="checkbox" checked={layers.schoolsOutsideArea} onChange={() => {}} />
+                <input type="checkbox" checked={layers.srv_schoolsOutside} onChange={() => {}} />
               </div>
               <div className="layer-group-label">GREEN SPACE</div>
-              <div className={`layer-item mini ${layers.park ? 'active' : ''}`} onClick={() => toggleLayer('park')}>
+              <div className={`layer-item mini ${layers.inf_parks ? 'active' : ''}`} onClick={() => toggleLayer('inf_parks')}>
                 <div className="layer-icon-dot" style={{ background: '#43a047' }}><Trees size={12} color="#fff" /></div>
-                <span className="layer-name">Park</span>
-                <input type="checkbox" checked={layers.park} onChange={() => {}} />
+                <span className="layer-name">Parks</span>
+                <input type="checkbox" checked={layers.inf_parks} onChange={() => {}} />
               </div>
-              <div className={`layer-item mini service-area ${layers.parkArea ? 'active' : ''}`} onClick={() => toggleLayer('parkArea')}>
+              <div className={`layer-item mini service-area ${layers.srv_parks ? 'active' : ''}`} onClick={() => toggleLayer('srv_parks')}>
                 <div className="layer-legend-sq" style={{ background: '#43a047' }}></div>
-                <span className="layer-name">↳ Service Area 500m</span>
-                <input type="checkbox" checked={layers.parkArea} onChange={() => {}} />
+                <span className="layer-name">↳ Parks_500m</span>
+                <input type="checkbox" checked={layers.srv_parks} onChange={() => {}} />
               </div>
             </>)}
 
@@ -943,6 +816,7 @@ export default function App() {
           )}
           {/* Ownership Bar Charts — Slide 2 only */}
           {currentSlide === 1 && (layers.state2026 || layers.state2024) && (
+
             <section className="chart-section">
               <span className="chart-title">State Ownership (ha)</span>
               <div style={{ width: '100%', height: 160 }}>
@@ -1007,3 +881,4 @@ export default function App() {
     </div>
   )
 }
+
