@@ -75,6 +75,7 @@ export default function App() {
   const [geoJsonData, setGeoJsonData] = useState(null)
   const [oldNakvetiData, setOldNakvetiData] = useState(null)
   const [newNakvetiData, setNewNakvetiData] = useState(null)
+  const [urbanFabric, setUrbanFabric] = useState(null)
   
   // New Ownership Layers
   const [state2026, setState2026] = useState(null)
@@ -114,6 +115,7 @@ export default function App() {
   const [currentSlide, setCurrentSlide] = useState(0)
   const [layers, setLayers] = useState({
     projectArea: true,
+    urbanFabric: true,
     plots2024: true,
     plots2026: true,
     state2026: false,
@@ -138,11 +140,11 @@ export default function App() {
 
   const slideLayerSets = [
     // Slide 1: Land Plots overview
-    { projectArea: true, plots2024: true, plots2026: true, state2026: false, muni2026: false, relig2026: false, state2024: false, muni2024: false, relig2024: false, inf_emergency: false, inf_hospital: false, inf_kindergarten: false, inf_parks: false, inf_privateSchool: false, inf_publicSchool: false, inf_schoolsOutside: false, inf_police: false, srv_emergency: false, srv_hospital: false, srv_kindergarten: false, srv_parks: false, srv_privateSchool: false, srv_publicSchool: false, srv_schoolsOutside: false, srv_police: false },
+    { projectArea: true, urbanFabric: true, plots2024: true, plots2026: true, state2026: false, muni2026: false, relig2026: false, state2024: false, muni2024: false, relig2024: false, inf_emergency: false, inf_hospital: false, inf_kindergarten: false, inf_parks: false, inf_privateSchool: false, inf_publicSchool: false, inf_schoolsOutside: false, inf_police: false, srv_emergency: false, srv_hospital: false, srv_kindergarten: false, srv_parks: false, srv_privateSchool: false, srv_publicSchool: false, srv_schoolsOutside: false, srv_police: false },
     // Slide 2: Ownership breakdown
-    { projectArea: true, plots2024: false, plots2026: false, state2026: true, muni2026: true, relig2026: true, state2024: true, muni2024: true, relig2024: true, inf_emergency: false, inf_hospital: false, inf_kindergarten: false, inf_parks: false, inf_privateSchool: false, inf_publicSchool: false, inf_schoolsOutside: false, inf_police: false, srv_emergency: false, srv_hospital: false, srv_kindergarten: false, srv_parks: false, srv_privateSchool: false, srv_publicSchool: false, srv_schoolsOutside: false, srv_police: false },
+    { projectArea: true, urbanFabric: true, plots2024: false, plots2026: false, state2026: true, muni2026: true, relig2026: true, state2024: true, muni2024: true, relig2024: true, inf_emergency: false, inf_hospital: false, inf_kindergarten: false, inf_parks: false, inf_privateSchool: false, inf_publicSchool: false, inf_schoolsOutside: false, inf_police: false, srv_emergency: false, srv_hospital: false, srv_kindergarten: false, srv_parks: false, srv_privateSchool: false, srv_publicSchool: false, srv_schoolsOutside: false, srv_police: false },
     // Slide 3: Social Infrastructure
-    { projectArea: true, plots2024: false, plots2026: false, state2026: false, muni2026: false, relig2026: false, state2024: false, muni2024: false, relig2024: false, inf_emergency: true, inf_hospital: true, inf_kindergarten: true, inf_parks: true, inf_privateSchool: true, inf_publicSchool: true, inf_schoolsOutside: true, inf_police: true, srv_emergency: true, srv_hospital: true, srv_kindergarten: true, srv_parks: true, srv_privateSchool: true, srv_publicSchool: true, srv_schoolsOutside: true, srv_police: true }
+    { projectArea: true, urbanFabric: true, plots2024: false, plots2026: false, state2026: false, muni2026: false, relig2026: false, state2024: false, muni2024: false, relig2024: false, inf_emergency: true, inf_hospital: true, inf_kindergarten: true, inf_parks: true, inf_privateSchool: true, inf_publicSchool: true, inf_schoolsOutside: true, inf_police: true, srv_emergency: true, srv_hospital: true, srv_kindergarten: true, srv_parks: true, srv_privateSchool: true, srv_publicSchool: true, srv_schoolsOutside: true, srv_police: true }
   ]
 
   const slides = [
@@ -177,6 +179,7 @@ export default function App() {
 
         setOldNakvetiData(await fetchShapefile('/data/OLD_nakveti'))
         setNewNakvetiData(await fetchShapefile('/data/New_nakveti'))
+        setUrbanFabric(await fetchShapefile('/data/Urban_Fabric'))
 
         // 2. Load 2026 Ownership Layers
         setState2026(await fetchShapefile('/data/New_saxelmwifo'))
@@ -384,6 +387,19 @@ export default function App() {
                 </div>
               </Popup>
             </GeoJSON>
+          )}
+
+          {/* Urban Fabric */}
+          {urbanFabric && layers.urbanFabric && (
+            <GeoJSON 
+              data={urbanFabric} 
+              style={{
+                color: '#ebcb8b',
+                weight: 1,
+                fillColor: '#ebcb8b',
+                fillOpacity: 0.5
+              }}
+            />
           )}
 
           {/* Land Plots 2024 (OLD) */}
@@ -611,6 +627,12 @@ export default function App() {
               <div className="layer-legend" style={{ background: '#00e5ff' }}></div>
               <span className="layer-name">Project Area</span>
               <input type="checkbox" checked={layers.projectArea} onChange={() => {}} />
+            </div>
+
+            <div className={`layer-item ${layers.urbanFabric ? 'active' : ''}`} onClick={() => toggleLayer('urbanFabric')}>
+              <div className="layer-legend" style={{ background: '#ebcb8b' }}></div>
+              <span className="layer-name">Urban Fabric</span>
+              <input type="checkbox" checked={layers.urbanFabric} onChange={() => {}} />
             </div>
 
             {/* Slide 1: Land Plots */}
