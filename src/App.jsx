@@ -71,10 +71,34 @@ function MapController({ bounds, theme, isSatellite, isMeasuring, onMeasureChang
   return null
 }
 
+const getServiceAreaStyle = (feature, baseColor) => {
+  const p = feature.properties || {};
+  const toBreak = p.ToBreak || p.tobreak || p.TOBREAK;
+  const name = p.Name || p.name || p.NAME || '';
+  
+  let isInner = false;
+  if (toBreak !== undefined && toBreak !== null) {
+    isInner = toBreak <= 500;
+  } else if (typeof name === 'string' && name.includes('0 - 500')) {
+    isInner = true;
+  } else if (typeof name === 'string' && name.includes('500 - 750')) {
+    isInner = false;
+  }
+  
+  return {
+    color: baseColor,
+    weight: 1.5,
+    dashArray: '5,4',
+    fillColor: baseColor,
+    fillOpacity: isInner ? 0.35 : 0.12
+  };
+};
+
 export default function App() {
   const [geoJsonData, setGeoJsonData] = useState(null)
   const [oldNakvetiData, setOldNakvetiData] = useState(null)
   const [newNakvetiData, setNewNakvetiData] = useState(null)
+  const [sistemuriNakveti, setSistemuriNakveti] = useState(null)
   const [urbanFabric, setUrbanFabric] = useState(null)
   
   // New Ownership Layers
@@ -118,6 +142,7 @@ export default function App() {
     urbanFabric: true,
     plots2024: true,
     plots2026: true,
+    sistemuriNakveti: true,
     state2026: false,
     muni2026: false,
     relig2026: false,
@@ -140,11 +165,11 @@ export default function App() {
 
   const slideLayerSets = [
     // Slide 1: Land Plots overview
-    { projectArea: true, urbanFabric: true, plots2024: true, plots2026: true, state2026: false, muni2026: false, relig2026: false, state2024: false, muni2024: false, relig2024: false, inf_emergency: false, inf_hospital: false, inf_kindergarten: false, inf_parks: false, inf_privateSchool: false, inf_publicSchool: false, inf_schoolsOutside: false, inf_police: false, srv_emergency: false, srv_hospital: false, srv_kindergarten: false, srv_parks: false, srv_privateSchool: false, srv_publicSchool: false, srv_schoolsOutside: false, srv_police: false },
+    { projectArea: true, urbanFabric: true, plots2024: true, plots2026: true, sistemuriNakveti: true, state2026: false, muni2026: false, relig2026: false, state2024: false, muni2024: false, relig2024: false, inf_emergency: false, inf_hospital: false, inf_kindergarten: false, inf_parks: false, inf_privateSchool: false, inf_publicSchool: false, inf_schoolsOutside: false, inf_police: false, srv_emergency: false, srv_hospital: false, srv_kindergarten: false, srv_parks: false, srv_privateSchool: false, srv_publicSchool: false, srv_schoolsOutside: false, srv_police: false },
     // Slide 2: Ownership breakdown
-    { projectArea: true, urbanFabric: true, plots2024: false, plots2026: false, state2026: true, muni2026: true, relig2026: true, state2024: true, muni2024: true, relig2024: true, inf_emergency: false, inf_hospital: false, inf_kindergarten: false, inf_parks: false, inf_privateSchool: false, inf_publicSchool: false, inf_schoolsOutside: false, inf_police: false, srv_emergency: false, srv_hospital: false, srv_kindergarten: false, srv_parks: false, srv_privateSchool: false, srv_publicSchool: false, srv_schoolsOutside: false, srv_police: false },
+    { projectArea: true, urbanFabric: true, plots2024: false, plots2026: false, sistemuriNakveti: true, state2026: true, muni2026: true, relig2026: true, state2024: true, muni2024: true, relig2024: true, inf_emergency: false, inf_hospital: false, inf_kindergarten: false, inf_parks: false, inf_privateSchool: false, inf_publicSchool: false, inf_schoolsOutside: false, inf_police: false, srv_emergency: false, srv_hospital: false, srv_kindergarten: false, srv_parks: false, srv_privateSchool: false, srv_publicSchool: false, srv_schoolsOutside: false, srv_police: false },
     // Slide 3: Social Infrastructure
-    { projectArea: true, urbanFabric: true, plots2024: false, plots2026: false, state2026: false, muni2026: false, relig2026: false, state2024: false, muni2024: false, relig2024: false, inf_emergency: true, inf_hospital: true, inf_kindergarten: true, inf_parks: true, inf_privateSchool: true, inf_publicSchool: true, inf_schoolsOutside: true, inf_police: true, srv_emergency: true, srv_hospital: true, srv_kindergarten: true, srv_parks: true, srv_privateSchool: true, srv_publicSchool: true, srv_schoolsOutside: true, srv_police: true }
+    { projectArea: true, urbanFabric: true, plots2024: false, plots2026: false, sistemuriNakveti: false, state2026: false, muni2026: false, relig2026: false, state2024: false, muni2024: false, relig2024: false, inf_emergency: true, inf_hospital: true, inf_kindergarten: true, inf_parks: true, inf_privateSchool: true, inf_publicSchool: true, inf_schoolsOutside: true, inf_police: true, srv_emergency: true, srv_hospital: true, srv_kindergarten: true, srv_parks: true, srv_privateSchool: true, srv_publicSchool: true, srv_schoolsOutside: true, srv_police: true }
   ]
 
   const slides = [
@@ -180,6 +205,7 @@ export default function App() {
         setOldNakvetiData(await fetchShapefile('/data/OLD_nakveti'))
         setNewNakvetiData(await fetchShapefile('/data/New_nakveti'))
         setUrbanFabric(await fetchShapefile('/data/Urban_Fabric'))
+        setSistemuriNakveti(await fetchShapefile('/data/sistemuri_nakveti'))
 
         // 2. Load 2026 Ownership Layers
         setState2026(await fetchShapefile('/data/New_saxelmwifo'))
@@ -204,11 +230,11 @@ export default function App() {
         // 5. Load Service Area Buffers
         setAreaEmergency(await fetchShapefile('/data/Emergency Medical Services_2000m'))
         setAreaHospital(await fetchShapefile('/data/Hospital_1000m'))
-        setAreaKindergarten(await fetchShapefile('/data/Kindergarten_500m'))
+        setAreaKindergarten(await fetchShapefile('/data/Kindergarten_300m'))
         setAreaParks(await fetchShapefile('/data/Parks_500m'))
-        setAreaPrivateSchool(await fetchShapefile('/data/Private_School_750m'))
-        setAreaPublicSchool(await fetchShapefile('/data/Public_School_750m'))
-        setAreaSchoolsOutside(await fetchShapefile('/data/Outside_School_750m'))
+        setAreaPrivateSchool(await fetchShapefile('/data/Private_School_500_750m'))
+        setAreaPublicSchool(await fetchShapefile('/data/Public_School_500_750m'))
+        setAreaSchoolsOutside(await fetchShapefile('/data/Outside_School_500_750m'))
         setAreaPolice(await fetchShapefile('/data/Police_Emergency Services_2000m'))
 
       } catch (error) {
@@ -275,6 +301,7 @@ export default function App() {
 
     searchInLayer(oldNakvetiData, 'Plots 2024')
     searchInLayer(newNakvetiData, 'Plots 2026')
+    searchInLayer(sistemuriNakveti, 'Ongoing Field Work')
     setSearchResults(results.slice(0, 8))
   }
 
@@ -450,6 +477,27 @@ export default function App() {
             />
           )}
 
+          {/* Ongoing Field Work Data */}
+          {sistemuriNakveti && layers.sistemuriNakveti && (
+            <GeoJSON 
+              data={sistemuriNakveti} 
+              style={{
+                color: 'rgb(255, 0, 197)',
+                weight: 1.5,
+                fillOpacity: 0
+              }}
+              onEachFeature={(feature, layer) => {
+                const p = feature.properties || {}
+                layer.bindPopup(`
+                  <div class="popup-content">
+                    <h4>Ongoing Field Work Data</h4>
+                    <div class="attr-row"><strong>CADCODE:</strong> ${p.CADCODE || p.cadcode || 'N/A'}</div>
+                  </div>
+                `, { className: 'custom-popup' })
+              }}
+            />
+          )}
+
           {/* New Ownership Layers 2026 */}
           {state2026 && layers.state2026 && (
             <GeoJSON data={state2026} style={{ color: '#23ae93', weight: 1.5, fillColor: '#23ae93', fillOpacity: 0.6 }} />
@@ -528,13 +576,13 @@ export default function App() {
             <GeoJSON key={`srv-pk-${areaParks.features?.length}-${Date.now()}`} data={areaParks} style={{ color: '#43a047', weight: 1.5, dashArray: '5,4', fillColor: '#43a047', fillOpacity: 0.12 }} />
           )}
           {areaPrivateSchool && layers.srv_privateSchool && (
-            <GeoJSON key={`srv-ps-${areaPrivateSchool.features?.length}-${Date.now()}`} data={areaPrivateSchool} style={{ color: '#29b6f6', weight: 1.5, dashArray: '5,4', fillColor: '#29b6f6', fillOpacity: 0.12 }} />
+            <GeoJSON key={`srv-ps-${areaPrivateSchool.features?.length}-${Date.now()}`} data={areaPrivateSchool} style={(f) => getServiceAreaStyle(f, '#29b6f6')} />
           )}
           {areaPublicSchool && layers.srv_publicSchool && (
-            <GeoJSON key={`srv-pb-${areaPublicSchool.features?.length}-${Date.now()}`} data={areaPublicSchool} style={{ color: '#f9a825', weight: 1.5, dashArray: '5,4', fillColor: '#f9a825', fillOpacity: 0.12 }} />
+            <GeoJSON key={`srv-pb-${areaPublicSchool.features?.length}-${Date.now()}`} data={areaPublicSchool} style={(f) => getServiceAreaStyle(f, '#f9a825')} />
           )}
           {areaSchoolsOutside && layers.srv_schoolsOutside && (
-            <GeoJSON key={`srv-so-${areaSchoolsOutside.features?.length}-${Date.now()}`} data={areaSchoolsOutside} style={{ color: '#78909c', weight: 1.5, dashArray: '5,4', fillColor: '#78909c', fillOpacity: 0.12 }} />
+            <GeoJSON key={`srv-so-${areaSchoolsOutside.features?.length}-${Date.now()}`} data={areaSchoolsOutside} style={(f) => getServiceAreaStyle(f, '#78909c')} />
           )}
           {areaPolice && layers.srv_police && (
             <GeoJSON key={`srv-po-${areaPolice.features?.length}-${Date.now()}`} data={areaPolice} style={{ color: '#1565c0', weight: 1.5, dashArray: '5,4', fillColor: '#1565c0', fillOpacity: 0.12 }} />
@@ -637,6 +685,12 @@ export default function App() {
 
             {/* Slide 1: Land Plots */}
             {currentSlide === 0 && (<>
+              <div className="layer-group-label">FIELD WORK</div>
+              <div className={`layer-item ${layers.sistemuriNakveti ? 'active' : ''}`} onClick={() => toggleLayer('sistemuriNakveti')}>
+                <div className="layer-legend" style={{ border: '2px solid rgb(255, 0, 197)', background: 'transparent' }}></div>
+                <span className="layer-name">Ongoing Field Work Data (სისტემური რეგისტრაცია- საველე სამუშაოების მონაცემები)</span>
+                <input type="checkbox" checked={layers.sistemuriNakveti} onChange={() => {}} />
+              </div>
               <div className="layer-group-label">2026 LAYERS</div>
               <div className={`layer-item ${layers.plots2026 ? 'active' : ''}`} onClick={() => toggleLayer('plots2026')}>
                 <div className="layer-legend" style={{ background: '#ffeb3b' }}></div>
@@ -692,7 +746,7 @@ export default function App() {
               </div>
               <div className={`layer-item mini service-area ${layers.srv_kindergarten ? 'active' : ''}`} onClick={() => toggleLayer('srv_kindergarten')}>
                 <div className="layer-legend-sq" style={{ background: '#ff9800' }}></div>
-                <span className="layer-name">↳ Kindergarten_500m</span>
+                <span className="layer-name">↳ Kindergarten 300m</span>
                 <input type="checkbox" checked={layers.srv_kindergarten} onChange={() => {}} />
               </div>
               <div className={`layer-item mini ${layers.inf_privateSchool ? 'active' : ''}`} onClick={() => toggleLayer('inf_privateSchool')}>
@@ -702,7 +756,7 @@ export default function App() {
               </div>
               <div className={`layer-item mini service-area ${layers.srv_privateSchool ? 'active' : ''}`} onClick={() => toggleLayer('srv_privateSchool')}>
                 <div className="layer-legend-sq" style={{ background: '#29b6f6' }}></div>
-                <span className="layer-name">↳ Private_School_750m</span>
+                <span className="layer-name">↳ Private School 500 750m</span>
                 <input type="checkbox" checked={layers.srv_privateSchool} onChange={() => {}} />
               </div>
               <div className={`layer-item mini ${layers.inf_publicSchool ? 'active' : ''}`} onClick={() => toggleLayer('inf_publicSchool')}>
@@ -712,7 +766,7 @@ export default function App() {
               </div>
               <div className={`layer-item mini service-area ${layers.srv_publicSchool ? 'active' : ''}`} onClick={() => toggleLayer('srv_publicSchool')}>
                 <div className="layer-legend-sq" style={{ background: '#f9a825' }}></div>
-                <span className="layer-name">↳ Public_School_750m</span>
+                <span className="layer-name">↳ Public School 500 750m</span>
                 <input type="checkbox" checked={layers.srv_publicSchool} onChange={() => {}} />
               </div>
               <div className={`layer-item mini ${layers.inf_schoolsOutside ? 'active' : ''}`} onClick={() => toggleLayer('inf_schoolsOutside')}>
@@ -722,7 +776,7 @@ export default function App() {
               </div>
               <div className={`layer-item mini service-area ${layers.srv_schoolsOutside ? 'active' : ''}`} onClick={() => toggleLayer('srv_schoolsOutside')}>
                 <div className="layer-legend-sq" style={{ background: '#78909c' }}></div>
-                <span className="layer-name">↳ Service Area 750m</span>
+                <span className="layer-name">↳ Outside School 500 750m</span>
                 <input type="checkbox" checked={layers.srv_schoolsOutside} onChange={() => {}} />
               </div>
               <div className="layer-group-label">GREEN SPACE</div>
@@ -733,13 +787,19 @@ export default function App() {
               </div>
               <div className={`layer-item mini service-area ${layers.srv_parks ? 'active' : ''}`} onClick={() => toggleLayer('srv_parks')}>
                 <div className="layer-legend-sq" style={{ background: '#43a047' }}></div>
-                <span className="layer-name">↳ Parks_500m</span>
+                <span className="layer-name">↳ Parks 500m</span>
                 <input type="checkbox" checked={layers.srv_parks} onChange={() => {}} />
               </div>
             </>)}
 
             {/* Slide 2: Ownership */}
             {currentSlide === 1 && (<>
+              <div className="layer-group-label">FIELD WORK</div>
+              <div className={`layer-item mini ${layers.sistemuriNakveti ? 'active' : ''}`} onClick={() => toggleLayer('sistemuriNakveti')}>
+                <div className="layer-legend" style={{ border: '2px solid rgb(255, 0, 197)', background: 'transparent' }}></div>
+                <span className="layer-name">Ongoing Field Work Data (სისტემური რეგისტრაცია- საველე სამუშაოების მონაცემები)</span>
+                <input type="checkbox" checked={layers.sistemuriNakveti} onChange={() => {}} />
+              </div>
               <div className="layer-group-label">2026 OWNERSHIP</div>
               <div className={`layer-item mini ${layers.state2026 ? 'active' : ''}`} onClick={() => toggleLayer('state2026')}>
                 <div className="layer-legend" style={{ background: '#23ae93' }}></div>
